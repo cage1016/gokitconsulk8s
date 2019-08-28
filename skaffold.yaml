@@ -1,0 +1,42 @@
+apiVersion: skaffold/v1beta13
+kind: Config
+build:
+  local: {}
+  tagPolicy:
+    sha256: {}
+  artifacts:
+    - image: cage1016/gokitconsulk8s-addsvc
+      custom:
+        buildCommand: "make dev_docker_addsvc"
+        dependencies:
+          paths:
+            - cmd/addsvc/main.go
+            - pkg/addsvc
+    - image: cage1016/gokitconsulk8s-foosvc
+      custom:
+        buildCommand: "make dev_docker_foosvc"
+        dependencies:
+          paths:
+            - cmd/foosvc/main.go
+            - pkg/foosvc
+#  - image: hykuan1126/gokitconsul-gateway
+#    context: .
+#    docker:
+#      dockerfile: deployments/docker/Dockerfile
+#      buildArgs:
+#        SVC_NAME: "gateway"
+#  - image: fluentd
+#    context: ./deployments/docker/fluentd
+#    docker:
+#      dockerfile: Dockerfile
+deploy:
+  kubectl:
+    manifests:
+      - ./deployments/k8s/*.yaml
+#  helm:
+#    releases:
+#    - name: gokitconsulk8s-helm
+#      chartPath: deployments/k8s
+#      values:
+#        addsvc.image: cage1016/gokitconsulk8s-addsvc:latest
+#        foosvc.image: cage1016/gokitconsulk8s-foosvc:latest

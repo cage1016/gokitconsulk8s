@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package pb;
+
+// The Foosvc service definition.
+service Foosvc {
+    
+    rpc Foo (FooRequest) returns (FooReply) {
+    }
+}
+
+message FooRequest {
+    string s = 1;
+}
+
+message FooReply {
+    string res = 1;
+    string err = 2;
+}

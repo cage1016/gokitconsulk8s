@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package pb;
+
+// The Addsvc service definition.
+service Addsvc {
+    
+    rpc Sum (SumRequest) returns (SumReply) {
+    }
+
+    rpc Concat (ConcatRequest) returns (ConcatReply) {
+    }
+}
+
+message SumRequest {
+    int64 a = 1;
+    int64 b = 2;
+}
+
+message SumReply {
+    int64 rs = 1;
+    string err = 2;
+}
+
+message ConcatRequest {
+    string a = 1;
+    string b = 2;
+}
+
+message ConcatReply {
+    string rs = 1;
+    string err = 2;
+}

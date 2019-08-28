@@ -1,0 +1,4 @@
+FROM scratch
+ARG SVC_NAME
+COPY gokitconsulk8s-$SVC_NAME /exe
+ENTRYPOINT ["/exe"]

@@ -1,0 +1,6 @@
+FROM cage1016/gokitconsulk8s-debug-builder:latest
+ARG SVC_NAME
+
+COPY gokitconsulk8s-$SVC_NAME /exe
+
+CMD ["/go/bin/dlv", "--listen=:2345", "--headless=true", "--api-version=2", "exec", "/exe"]
