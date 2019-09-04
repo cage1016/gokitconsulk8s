@@ -36,7 +36,7 @@ spec:
             - name: QS_ZIPKIN_V2_URL
               value: http://zipkin:9411/api/v2/spans
           image: cage1016/gokitconsulk8s-foosvc
-          name: gokitconsul-foosvc
+          name: gokitconsulk8s-foosvc
           resources: {}
       restartPolicy: Always
 status: {}

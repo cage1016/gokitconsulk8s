@@ -19,16 +19,17 @@ build:
           paths:
             - cmd/foosvc/main.go
             - pkg/foosvc
-#  - image: hykuan1126/gokitconsul-gateway
-#    context: .
-#    docker:
-#      dockerfile: deployments/docker/Dockerfile
-#      buildArgs:
-#        SVC_NAME: "gateway"
-#  - image: fluentd
-#    context: ./deployments/docker/fluentd
-#    docker:
-#      dockerfile: Dockerfile
+    - image: cage1016/gokitconsulk8s-router
+      custom:
+        buildCommand: "make dev_docker_router"
+        dependencies:
+          paths:
+            - cmd/router/main.go
+            - pkg/router
+    - image: cage1016/gokitconsulk8s-website
+      context: deployments/k8s/website
+      docker:
+        dockerfile: DockerFile
 deploy:
   kubectl:
     manifests:

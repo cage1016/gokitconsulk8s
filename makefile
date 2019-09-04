@@ -1,5 +1,5 @@
 BUILD_DIR = build
-SERVICES = addsvc foosvc
+SERVICES = addsvc foosvc router
 DOCKERS_CLEANBUILD = $(addprefix prod_docker_,$(SERVICES))
 DOCKERS_DEV = $(addprefix dev_docker_,$(SERVICES))
 DOCKERS_DEBUG = $(addprefix debug_docker_,$(SERVICES))

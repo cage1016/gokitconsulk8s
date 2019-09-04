@@ -1,0 +1,86 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gokitconsulk8s-ingress
+spec:
+  type: LoadBalancer
+  selector:
+    app: gokitconsulk8s-ingress
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 80
+      nodePort: 30000
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gokitconsulk8s-ingress-configmap
+data:
+  config: |
+    events {
+      worker_connections  1024;
+    }
+    http {
+      upstream gokitconsulk8s-website {
+        keepalive 100;
+        server localhost:8080;
+      }
+      upstream gokitconsulk8s-router {
+        keepalive 100;
+        server localhost:8000;
+      }
+      server {
+        location / {
+          proxy_http_version 1.1;
+          proxy_pass http://gokitconsulk8s-website;
+          proxy_set_header Host $host;
+        }
+
+        location ~ ^/api(/.*)?$ {
+          proxy_http_version 1.1;
+          proxy_pass http://gokitconsulk8s-router$1$is_args$args;
+          proxy_pass_request_headers on;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gokitconsulk8s-ingress
+  labels:
+    app: gokitconsulk8s-ingress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gokitconsulk8s-ingress
+  template:
+    metadata:
+      name: gokitconsulk8s-ingress
+      labels:
+        app: gokitconsulk8s-ingress
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service-upstreams": "gokitconsulk8s-website:8080,gokitconsulk8s-router:8000"
+    spec:
+      volumes:
+        - name: config
+          configMap:
+            name: gokitconsulk8s-ingress-configmap
+            items:
+              - key: config
+                path: nginx.conf
+      containers:
+        - name: gokitconsulk8s-ingress
+          image: nginx:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/
