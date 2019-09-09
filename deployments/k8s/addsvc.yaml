@@ -32,7 +32,7 @@ spec:
               value: info
             - name: QS_ZIPKIN_V2_URL
               value: http://zipkin:9411/api/v2/spans
-          image: cage1016/gokitconsulk8s-addsvc:latest
+          image: cage1016/gokitconsulk8s-addsvc
           name: gokitconsulk8s-addsvc
           resources: {}
       restartPolicy: Always

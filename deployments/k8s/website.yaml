@@ -15,6 +15,7 @@ spec:
         app: gokitconsulk8s-website
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service": "website"
     spec:
       containers:
         - name: gokitconsulk8s-website

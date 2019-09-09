@@ -22,8 +22,8 @@ spec:
         app: gokitconsulk8s-router
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "consul.hashicorp.com/connect-service": "gokitconsulk8s-router"
-        "consul.hashicorp.com/connect-service-upstreams": "addsvc:8021,foosvc:7021,cc-consul-server:8500"
+        "consul.hashicorp.com/connect-service": "router"
+        "consul.hashicorp.com/connect-service-upstreams": "addsvc:8021,foosvc:7021"
         "consul.hashicorp.com/connect-service-port": "8000"
     spec:
       containers:
