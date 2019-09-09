@@ -20,11 +20,23 @@ kind: ConfigMap
 metadata:
   name: gokitconsulk8s-ingress-configmap
 data:
+  zipkin: |
+    {
+      "service_name": "nginx",
+      "collector_host": "zipkin",
+      "collector_port": 9411
+    }
+
   config: |
+    load_module modules/ngx_http_opentracing_module.so;
+
     events {
       worker_connections  1024;
     }
     http {
+      opentracing_load_tracer /usr/local/lib/libzipkin_opentracing_plugin.so /etc/nginx/zipkin.json;
+      opentracing on;
+
       upstream gokitconsulk8s-website {
         keepalive 100;
         server localhost:8080;
@@ -38,12 +50,16 @@ data:
           proxy_http_version 1.1;
           proxy_pass http://gokitconsulk8s-website;
           proxy_set_header Host $host;
+
+          opentracing_propagate_context;
         }
 
         location ~ ^/api(/.*)?$ {
           proxy_http_version 1.1;
           proxy_pass http://gokitconsulk8s-router$1$is_args$args;
           proxy_pass_request_headers on;
+
+          opentracing_propagate_context;
         }
       }
     }
@@ -66,21 +82,27 @@ spec:
         app: gokitconsulk8s-ingress
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "consul.hashicorp.com/connect-service-upstreams": "gokitconsulk8s-website:8080,gokitconsulk8s-router:8000"
+        "consul.hashicorp.com/connect-service": "nginx"
+        "consul.hashicorp.com/connect-service-upstreams": "website:8080,router:8000"
     spec:
       volumes:
         - name: config
           configMap:
             name: gokitconsulk8s-ingress-configmap
-            items:
-              - key: config
-                path: nginx.conf
+      initContainers:
+        - name: init-opentracing
+          image: cirrusci/wget
+          command: ['sh', '-c', 'wget -O - https://github.com/rnburn/zipkin-cpp-opentracing/releases/download/v0.5.2/linux-amd64-libzipkin_opentracing_plugin.so.gz | gunzip -c > /usr/local/lib/libzipkin_opentracing_plugin.so']
       containers:
         - name: gokitconsulk8s-ingress
-          image: nginx:latest
+          image: opentracing/nginx-opentracing
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
           volumeMounts:
             - name: config
-              mountPath: /etc/nginx/
+              mountPath: /etc/nginx/nginx.conf
+              subPath: config
+            - name: config
+              mountPath: /etc/nginx/zipkin.json
+              subPath: zipkin
