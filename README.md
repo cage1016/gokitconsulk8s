@@ -57,6 +57,12 @@ $ curl -X "POST" "http://localhost:8080/api/foosvc/foo" -H 'Content-Type: applic
 
 ```
 
+__zipkin__
+
+visit http://localhost:9411
+
+![](docs/screenshot-zipkin.png)
+
 ## Author
 
 👤 **KAI-CHU CHUNG**
