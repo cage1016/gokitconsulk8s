@@ -23,7 +23,7 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/connect-service": "router"
-        "consul.hashicorp.com/connect-service-upstreams": "addsvc:8021,foosvc:7021"
+        "consul.hashicorp.com/connect-service-upstreams": "addsvc:8021,foosvc:7021,zipkin:9411"
         "consul.hashicorp.com/connect-service-port": "8000"
     spec:
       containers:
@@ -39,7 +39,7 @@ spec:
             - name: QS_ROUTER_HTTP_PORT
               value: "8000"
             - name: QS_ZIPKIN_V2_URL
-              value: http://zipkin:9411/api/v2/spans
+              value: http://localhost:9411/api/v2/spans
           image: cage1016/gokitconsulk8s-router
           name: gokitconsulk8s-router
           resources: {}

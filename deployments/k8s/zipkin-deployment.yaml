@@ -16,6 +16,9 @@ spec:
       creationTimestamp: null
       labels:
         io.kompose.service: zipkin
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service": "zipkin"
     spec:
       containers:
       - image: openzipkin/zipkin

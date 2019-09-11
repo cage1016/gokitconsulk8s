@@ -88,8 +88,6 @@ func main() {
 		}
 	}
 
-
-
 	errs := make(chan error, 2)
 	grpcServer, httpHandler := NewServer(cfg, conn, logger)
 	hs := health.NewServer()
