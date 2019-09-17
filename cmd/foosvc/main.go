@@ -74,6 +74,7 @@ func main() {
 		logger = log.With(logger, "caller", log.DefaultCaller)
 	}
 	cfg := loadConfig(logger)
+	logger = log.With(logger, "service", cfg.serviceName)
 
 	// addsvc grpc connection
 	var conn *grpc.ClientConn

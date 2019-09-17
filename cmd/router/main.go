@@ -75,6 +75,7 @@ func main() {
 		logger = log.With(logger, "caller", log.DefaultCaller)
 	}
 	cfg := loadConfig(logger)
+	logger = log.With(logger, "service", cfg.serviceName)
 
 	var tracer stdopentracing.Tracer
 	{
