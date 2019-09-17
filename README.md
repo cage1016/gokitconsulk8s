@@ -21,7 +21,7 @@ The gokitconsulk8s is comprised of 3 micorservice
 1. FooSvc
     - foo
 
-![](./infa.png)
+![](./docs/infa.png)
 
 ## Install
 
