@@ -96,8 +96,6 @@ spec:
         - name: ingress-http
           image: opentracing/nginx-opentracing
           imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 80
           volumeMounts:
             - name: config
               mountPath: /etc/nginx/nginx.conf
