@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/reflection"
 
 	routertransport "github.com/cage1016/gokitsonsulk8s/pkg/router/transport"
 )
@@ -218,5 +219,6 @@ func startGRPCServer(zipkinTracer *opzipkin.Tracer, port string, routerMap map[s
 		grpc.UnaryInterceptor(kitgrpc.Interceptor),
 		grpc.StatsHandler(zipkingrpc.NewServerHandler(zipkinTracer)),
 	)
+	reflection.Register(server)
 	errs <- server.Serve(listener)
 }
