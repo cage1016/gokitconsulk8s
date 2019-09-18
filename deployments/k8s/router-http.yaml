@@ -6,24 +6,25 @@ metadata:
     kompose.version: 1.18.0 ()
   creationTimestamp: null
   labels:
-    io.kompose.service: gokitconsulk8s-router
-  name: gokitconsulk8s-router
+    io.kompose.service: router-http
+  name: router-http
 spec:
   replicas: 1
   strategy: {}
   selector:
     matchLabels:
-      app: gokitconsulk8s-router
+      app: router-http
   template:
     metadata:
       creationTimestamp: null
       labels:
-        io.kompose.service: gokitconsulk8s-router
-        app: gokitconsulk8s-router
+        io.kompose.service: router-http
+        app: router-http
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "consul.hashicorp.com/connect-service": "router"
+        "consul.hashicorp.com/connect-service": "router-http"
         "consul.hashicorp.com/connect-service-upstreams": "addsvc:8021,foosvc:7021,zipkin:9411"
+        "consul.hashicorp.com/connect-service-protocol": "http"
         "consul.hashicorp.com/connect-service-port": "8000"
     spec:
       containers:
@@ -34,14 +35,12 @@ spec:
               value: localhost:8021
             - name: QS_FOOSVC_URL
               value: localhost:7021
-            - name: QS_ROUTER_GRPC_PORT
-              value: "8001"
             - name: QS_ROUTER_HTTP_PORT
               value: "8000"
             - name: QS_ZIPKIN_V2_URL
               value: http://localhost:9411/api/v2/spans
           image: cage1016/gokitconsulk8s-router
-          name: gokitconsulk8s-router
+          name: router-http
           resources: {}
       restartPolicy: Always
 status: {}
