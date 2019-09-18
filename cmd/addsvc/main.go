@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
 
 	pb "github.com/cage1016/gokitsonsulk8s/pb/addsvc"
 	"github.com/cage1016/gokitsonsulk8s/pkg/addsvc/endpoints"
@@ -154,5 +155,6 @@ func startGRPCServer(cfg config, hs *health.Server, grpcServer pb.AddsvcServer, 
 	server = grpc.NewServer(grpc.UnaryInterceptor(kitgrpc.Interceptor))
 	pb.RegisterAddsvcServer(server, grpcServer)
 	healthgrpc.RegisterHealthServer(server, hs)
+	reflection.Register(server)
 	errs <- server.Serve(listener)
 }

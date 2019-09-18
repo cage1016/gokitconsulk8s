@@ -1,0 +1,88 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-grpc
+spec:
+  type: LoadBalancer
+  selector:
+    app: ingress-grpc
+  ports:
+    - name: grpc
+      protocol: TCP
+      port: 8081
+      targetPort: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-grpc-configmap
+data:
+  zipkin: |
+    {
+      "service_name": "nginx",
+      "collector_host": "zipkin",
+      "collector_port": 9411
+    }
+
+  config: |
+    load_module modules/ngx_http_opentracing_module.so;
+
+    events {
+      worker_connections  1024;
+    }
+    http {
+      opentracing_load_tracer /usr/local/lib/libzipkin_opentracing_plugin.so /etc/nginx/zipkin.json;
+      opentracing on;
+
+      server {
+        listen 80 http2;
+
+        location / {
+          grpc_pass grpc://localhost:8001;
+
+          opentracing_grpc_propagate_context;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-grpc
+  labels:
+    app: ingress-grpc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingress-grpc
+  template:
+    metadata:
+      name: ingress-grpc
+      labels:
+        app: ingress-grpc
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service": "nginx-grpc"
+        "consul.hashicorp.com/connect-service-upstreams": "router-grpc:8001"
+    spec:
+      volumes:
+        - name: config
+          configMap:
+            name: ingress-grpc-configmap
+      initContainers:
+        - name: init-opentracing
+          image: cirrusci/wget
+          command: ['sh', '-c', 'wget -O - https://github.com/rnburn/zipkin-cpp-opentracing/releases/download/v0.5.2/linux-amd64-libzipkin_opentracing_plugin.so.gz | gunzip -c > /usr/local/lib/libzipkin_opentracing_plugin.so']
+      containers:
+        - name: ingress-grpc
+          image: opentracing/nginx-opentracing
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: config
+            - name: config
+              mountPath: /etc/nginx/zipkin.json
+              subPath: zipkin

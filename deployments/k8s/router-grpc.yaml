@@ -1,0 +1,46 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.18.0 ()
+  creationTimestamp: null
+  labels:
+    io.kompose.service: router-grpc
+  name: router-grpc
+spec:
+  replicas: 1
+  strategy: {}
+  selector:
+    matchLabels:
+      app: router-grpc
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: router-grpc
+        app: router-grpc
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service": "router-grpc"
+        "consul.hashicorp.com/connect-service-upstreams": "addsvc:8021,foosvc:7021,zipkin:9411"
+        "consul.hashicorp.com/connect-service-protocol": "grpc"
+        "consul.hashicorp.com/connect-service-port": "8001"
+    spec:
+      containers:
+        - env:
+            - name: QS_ROUTER_LOG_LEVEL
+              value: info
+            - name: QS_ADDSVC_URL
+              value: localhost:8021
+            - name: QS_FOOSVC_URL
+              value: localhost:7021
+            - name: QS_ROUTER_GRPC_PORT
+              value: "8001"
+            - name: QS_ZIPKIN_V2_URL
+              value: http://localhost:9411/api/v2/spans
+          image: cage1016/gokitconsulk8s-router
+          name: router-grpc
+          resources: {}
+      restartPolicy: Always
+status: {}

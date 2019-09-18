@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gokitconsulk8s-website
+  name: website
   labels:
-    app: gokitconsulk8s-website
+    app: website
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gokitconsulk8s-website
+      app: website
   template:
     metadata:
       labels:
-        app: gokitconsulk8s-website
+        app: website
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/connect-service": "website"
     spec:
       containers:
-        - name: gokitconsulk8s-website
+        - name: website
           image: cage1016/gokitconsulk8s-website
           ports:
             - containerPort: 80

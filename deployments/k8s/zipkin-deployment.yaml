@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - image: openzipkin/zipkin
-        name: gokitconsulk8s-zipkin
+        name: zipkin
         ports:
         - containerPort: 9411
         resources: {}

@@ -2,30 +2,42 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	kitgrpc "github.com/go-kit/kit/transport/grpc"
+	"github.com/mwitkow/grpc-proxy/proxy"
 	stdopentracing "github.com/opentracing/opentracing-go"
 	"github.com/openzipkin/zipkin-go"
+	opzipkin "github.com/openzipkin/zipkin-go"
+	zipkingrpc "github.com/openzipkin/zipkin-go/middleware/grpc"
 	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/reflection"
 
 	routertransport "github.com/cage1016/gokitsonsulk8s/pkg/router/transport"
 )
+
+const grpcRouterReg = `([a-zA-Z]+)/`
 
 const (
 	defZipkinV2URL   = ""
 	defNameSpace     = "gokitconsulk8s"
 	defServiceName   = "router"
 	defLogLevel      = "error"
-	defHTTPPort      = "8000"
-	defGRPCPort      = "8001"
+	defHTTPPort      = ""
+	defGRPCPort      = ""
 	defRretryTimeout = "500" // time.Millisecond
 	defRretryMax     = "3"
 	defAddsvcURL     = ""
@@ -64,6 +76,7 @@ type config struct {
 	retryTimeout int64
 	addsvcURL    string
 	foosvcURL    string
+	routerMap    map[string]string
 }
 
 func main() {
@@ -108,8 +121,8 @@ func main() {
 
 	r := routertransport.MakeHandler(ctx, cfg.addsvcURL, cfg.foosvcURL, cfg.retryMax, cfg.retryMax, tracer, zipkinTracer, logger)
 
-	go startHTTPServer(nil, r, cfg.httpPort, logger, errs)
-	//go startGRPCServer(consultAddress, tracer, zipkinTracer, cfg.grpcPort, cfg.serverCert, cfg.serverKey, logger, errs)
+	go startHTTPServer(r, cfg.httpPort, logger, errs)
+	go startGRPCServer(zipkinTracer, cfg.grpcPort, cfg.routerMap, logger, errs)
 
 	go func() {
 		c := make(chan os.Signal)
@@ -141,11 +154,71 @@ func loadConfig(logger log.Logger) (cfg config) {
 	cfg.retryTimeout = retryTimeout
 	cfg.addsvcURL = env(envAddsvcURL, defAddsvcURL)
 	cfg.foosvcURL = env(envFoosvcURL, defFoosvcURL)
+
+	cfg.routerMap = map[string]string{}
+	cfg.routerMap["addsvc"] = cfg.addsvcURL
+	cfg.routerMap["foosvc"] = cfg.foosvcURL
 	return
 }
 
-func startHTTPServer(tlsConfig *tls.Config, handler http.Handler, port string, logger log.Logger, errs chan error) {
+func startHTTPServer(handler http.Handler, port string, logger log.Logger, errs chan error) {
+	if port == "" {
+		return
+	}
 	p := fmt.Sprintf(":%s", port)
 	level.Info(logger).Log("protocol", "HTTP", "exposed", port)
 	errs <- http.ListenAndServe(p, handler)
+}
+
+func startGRPCServer(zipkinTracer *opzipkin.Tracer, port string, routerMap map[string]string, logger log.Logger, errs chan error) {
+	if port == "" {
+		return
+	}
+	p := fmt.Sprintf(":%s", port)
+	listener, err := net.Listen("tcp", p)
+	if err != nil {
+		level.Error(logger).Log("GRPC", "proxy", "listen", port, "err", err)
+		os.Exit(1)
+	}
+
+	re := regexp.MustCompile(grpcRouterReg)
+	director := func(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
+		serviceName := func(fullMethodName string) string {
+			x := re.FindSubmatch([]byte(fullMethodName))
+			return strings.ToLower(string(x[1]))
+		}(fullMethodName)
+
+		// Make sure we never forward internal services.
+		if _, ok := routerMap[serviceName]; !ok {
+			return nil, nil, grpc.Errorf(codes.Unimplemented, "Unknown method")
+		}
+
+		md, ok := metadata.FromIncomingContext(ctx)
+		// Copy the inbound metadata explicitly.
+		outCtx, _ := context.WithCancel(ctx)
+		outCtx = metadata.NewOutgoingContext(outCtx, md.Copy())
+
+		if ok {
+			conn, err := grpc.DialContext(
+				ctx,
+				routerMap[serviceName],
+				grpc.WithInsecure(),
+				grpc.WithStatsHandler(zipkingrpc.NewClientHandler(zipkinTracer)),
+				grpc.WithDefaultCallOptions(grpc.CallCustomCodec(proxy.Codec()), grpc.FailFast(false)),
+			)
+			return outCtx, conn, err
+		}
+		return nil, nil, grpc.Errorf(codes.Unimplemented, "Unknown method")
+	}
+
+	var server *grpc.Server
+	level.Info(logger).Log("GRPC", "proxy", "exposed", port)
+	server = grpc.NewServer(
+		grpc.CustomCodec(proxy.Codec()),
+		grpc.UnknownServiceHandler(proxy.TransparentHandler(director)),
+		grpc.UnaryInterceptor(kitgrpc.Interceptor),
+		grpc.StatsHandler(zipkingrpc.NewServerHandler(zipkinTracer)),
+	)
+	reflection.Register(server)
+	errs <- server.Serve(listener)
 }

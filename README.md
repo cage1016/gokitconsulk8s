@@ -14,7 +14,9 @@
 
 The gokitconsulk8s is comprised of 3 micorservice
 
-1. Router (golang)
+1. Router
+    - http
+    - grpc
 1. AddSvc
     - sum
     - concat
@@ -43,18 +45,35 @@ skaffold run
 ## Test
 
 ```bash
-## gateway 8000 sum
+## gateway 8080 sum
 $ curl -X "POST" "http://localhost:8080/api/addsvc/sum" -H 'Content-Type: application/json; charset=utf-8' -d $'{ "a": 3, "b": 34}'
 {"rs":37,"err":null}
 
-## gateway 8000 concat
+## gateway 8080 concat
 $ curl -X "POST" "http://localhost:8080/api/addsvc/concat" -H 'Content-Type: application/json; charset=utf-8' -d $'{ "a": "3", "b": "34"}'
 {"rs":"334","err":null}
 
-$ ## gateway 8000 foo
+## gateway 8080 foo
 $ curl -X "POST" "http://localhost:8080/api/foosvc/foo" -H 'Content-Type: application/json; charset=utf-8' -d $'{"s": "3ddd"}'
 {"res":"3dddbar","err":null}
 
+## grpc 8081 sum
+$ grpcurl -plaintext -proto ./pb/addsvc/addsvc.proto -d '{"a": 3, "b":5}' localhost:8081 pb.Addsvc.Sum
+{
+  "rs": "8"
+}
+
+## grpc 8081 concat
+$ grpcurl -plaintext -proto ./pb/addsvc/addsvc.proto -d '{"a": "3", "b":"5"}' localhost:8081 pb.Addsvc.Concat
+{
+  "rs": "35"
+}
+
+## grpc 8081 foo
+$ grpcurl -plaintext -proto ./pb/foosvc/foosvc.proto -d '{"s": "foo"}' localhost:8081 pb.Foosvc.Foo
+{
+  "res": "foobar"
+}
 ```
 
 __zipkin__
