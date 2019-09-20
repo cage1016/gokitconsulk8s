@@ -93,13 +93,15 @@ func main() {
 
 	tracer := initOpentracing()
 	zipkinTracer := initZipkin(cfg.serviceName, cfg.httpPort, cfg.zipkinV2URL, logger)
-	grpcServer, httpHandler := NewServer(conn, tracer, zipkinTracer, logger)
-	hs := health.NewServer()
-	hs.SetServingStatus(cfg.serviceName, healthgrpc.HealthCheckResponse_SERVING)
+
+	service := NewServer(conn, tracer, zipkinTracer, logger)
+	endpoints := endpoints.New(service, logger, tracer, zipkinTracer)
 
 	errs := make(chan error, 2)
-	go startHTTPServer(cfg, httpHandler, logger, errs)
-	go startGRPCServer(cfg, hs, grpcServer, logger, errs)
+	hs := health.NewServer()
+	hs.SetServingStatus(cfg.serviceName, healthgrpc.HealthCheckResponse_SERVING)
+	go startHTTPServer(endpoints, tracer, zipkinTracer, cfg.httpPort, logger, errs)
+	go startGRPCServer(endpoints, tracer, zipkinTracer, cfg.grpcPort, hs, logger, errs)
 
 	go func() {
 		c := make(chan os.Signal)
@@ -123,14 +125,10 @@ func loadConfig(logger log.Logger) (cfg config) {
 	return cfg
 }
 
-func NewServer(conn *grpc.ClientConn, tracer stdopentracing.Tracer, zipkinTracer *stdzipkin.Tracer, logger log.Logger) (pb.FoosvcServer, http.Handler) {
+func NewServer(conn *grpc.ClientConn, tracer stdopentracing.Tracer, zipkinTracer *stdzipkin.Tracer, logger log.Logger) (service.FoosvcService) {
 	addsvcservice := addsvctransports.NewGRPCClient(conn, tracer, zipkinTracer, logger)
 	service := service.New(addsvcservice, logger)
-	endpoints := endpoints.New(service, logger, tracer, zipkinTracer)
-	httpHandler := transports.NewHTTPHandler(endpoints, tracer, zipkinTracer, logger)
-	grpcServer := transports.MakeGRPCServer(endpoints, tracer, zipkinTracer, logger)
-
-	return grpcServer, httpHandler
+	return service
 }
 
 func initOpentracing() (tracer stdopentracing.Tracer) {
@@ -157,24 +155,24 @@ func initZipkin(serviceName, httpPort, zipkinV2URL string, logger log.Logger) (z
 	return
 }
 
-func startHTTPServer(cfg config, httpHandler http.Handler, logger log.Logger, errs chan error) {
-	p := fmt.Sprintf(":%s", cfg.httpPort)
-	level.Info(logger).Log("serviceName", cfg.serviceName, "protocol", "HTTP", "exposed", cfg.httpPort)
-	errs <- http.ListenAndServe(p, httpHandler)
+func startHTTPServer(endpoints endpoints.Endpoints, tracer stdopentracing.Tracer, zipkinTracer *zipkin.Tracer, port string, logger log.Logger, errs chan error) {
+	p := fmt.Sprintf(":%s", port)
+	level.Info(logger).Log("protocol", "HTTP", "exposed", port)
+	errs <- http.ListenAndServe(p, transports.NewHTTPHandler(endpoints, tracer, zipkinTracer, logger))
 }
 
-func startGRPCServer(cfg config, hs *health.Server, grpcServer pb.FoosvcServer, logger log.Logger, errs chan error) {
-	p := fmt.Sprintf(":%s", cfg.grpcPort)
+func startGRPCServer(endpoints endpoints.Endpoints, tracer stdopentracing.Tracer, zipkinTracer *zipkin.Tracer, port string, hs *health.Server, logger log.Logger, errs chan error) {
+	p := fmt.Sprintf(":%s", port)
 	listener, err := net.Listen("tcp", p)
 	if err != nil {
-		level.Error(logger).Log("serviceName", cfg.serviceName, "protocol", "GRPC", "listen", cfg.grpcPort, "err", err)
+		level.Error(logger).Log("protocol", "GRPC", "listen", port, "err", err)
 		os.Exit(1)
 	}
 
 	var server *grpc.Server
-	level.Info(logger).Log("serviceName", cfg.serviceName, "protocol", "GRPC", "exposed", cfg.grpcPort)
+	level.Info(logger).Log("protocol", "GRPC", "protocol", "GRPC", "exposed", port)
 	server = grpc.NewServer(grpc.UnaryInterceptor(kitgrpc.Interceptor))
-	pb.RegisterFoosvcServer(server, grpcServer)
+	pb.RegisterFoosvcServer(server, transports.MakeGRPCServer(endpoints, tracer, zipkinTracer, logger))
 	healthgrpc.RegisterHealthServer(server, hs)
 	reflection.Register(server)
 	errs <- server.Serve(listener)
