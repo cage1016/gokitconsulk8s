@@ -90,37 +90,12 @@ func main() {
 	cfg := loadConfig(logger)
 	logger = log.With(logger, "service", cfg.serviceName)
 
-	var tracer stdopentracing.Tracer
-	{
-		tracer = stdopentracing.GlobalTracer()
-	}
-
-	var zipkinTracer *zipkin.Tracer
-	{
-		var (
-			err           error
-			hostPort      = fmt.Sprintf("localhost:%s", cfg.httpPort)
-			serviceName   = cfg.serviceName
-			useNoopTracer = (cfg.zipkinV2URL == "")
-			reporter      = zipkinhttp.NewReporter(cfg.zipkinV2URL)
-		)
-		defer reporter.Close()
-		zEP, _ := zipkin.NewEndpoint(serviceName, hostPort)
-		zipkinTracer, err = zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(zEP), zipkin.WithNoopTracer(useNoopTracer))
-		if err != nil {
-			logger.Log("err", err)
-			os.Exit(1)
-		}
-		if !useNoopTracer {
-			logger.Log("tracer", "Zipkin", "type", "Native", "URL", cfg.zipkinV2URL)
-		}
-	}
-
+	tracer := initOpentracing()
+	zipkinTracer := initZipkin(cfg.serviceName, cfg.httpPort, cfg.zipkinV2URL, logger)
 	ctx := context.Background()
-	errs := make(chan error, 1)
-
 	r := routertransport.MakeHandler(ctx, cfg.addsvcURL, cfg.foosvcURL, cfg.retryMax, cfg.retryMax, tracer, zipkinTracer, logger)
 
+	errs := make(chan error, 1)
 	go startHTTPServer(r, cfg.httpPort, logger, errs)
 	go startGRPCServer(zipkinTracer, cfg.grpcPort, cfg.routerMap, logger, errs)
 
@@ -158,6 +133,30 @@ func loadConfig(logger log.Logger) (cfg config) {
 	cfg.routerMap = map[string]string{}
 	cfg.routerMap["addsvc"] = cfg.addsvcURL
 	cfg.routerMap["foosvc"] = cfg.foosvcURL
+	return
+}
+
+func initOpentracing() (tracer stdopentracing.Tracer) {
+	return stdopentracing.GlobalTracer()
+}
+
+func initZipkin(serviceName, httpPort, zipkinV2URL string, logger log.Logger) (zipkinTracer *zipkin.Tracer) {
+	var (
+		err           error
+		hostPort      = fmt.Sprintf("localhost:%s", httpPort)
+		useNoopTracer = (zipkinV2URL == "")
+		reporter      = zipkinhttp.NewReporter(zipkinV2URL)
+	)
+	zEP, _ := zipkin.NewEndpoint(serviceName, hostPort)
+	zipkinTracer, err = zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(zEP), zipkin.WithNoopTracer(useNoopTracer))
+	if err != nil {
+		logger.Log("err", err)
+		os.Exit(1)
+	}
+	if !useNoopTracer {
+		logger.Log("tracer", "Zipkin", "type", "Native", "URL", zipkinV2URL)
+	}
+
 	return
 }
 

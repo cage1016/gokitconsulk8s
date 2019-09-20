@@ -13,6 +13,7 @@ import (
 	kitgrpc "github.com/go-kit/kit/transport/grpc"
 	stdopentracing "github.com/opentracing/opentracing-go"
 	"github.com/openzipkin/zipkin-go"
+	stdzipkin "github.com/openzipkin/zipkin-go"
 	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -90,11 +91,13 @@ func main() {
 		}
 	}
 
-	errs := make(chan error, 2)
-	grpcServer, httpHandler := NewServer(cfg, conn, logger)
+	tracer := initOpentracing()
+	zipkinTracer := initZipkin(cfg.serviceName, cfg.httpPort, cfg.zipkinV2URL, logger)
+	grpcServer, httpHandler := NewServer(conn, tracer, zipkinTracer, logger)
 	hs := health.NewServer()
 	hs.SetServingStatus(cfg.serviceName, healthgrpc.HealthCheckResponse_SERVING)
 
+	errs := make(chan error, 2)
 	go startHTTPServer(cfg, httpHandler, logger, errs)
 	go startGRPCServer(cfg, hs, grpcServer, logger, errs)
 
@@ -120,33 +123,7 @@ func loadConfig(logger log.Logger) (cfg config) {
 	return cfg
 }
 
-func NewServer(cfg config, conn *grpc.ClientConn, logger log.Logger) (pb.FoosvcServer, http.Handler) {
-	var tracer stdopentracing.Tracer
-	{
-		tracer = stdopentracing.GlobalTracer()
-	}
-
-	var zipkinTracer *zipkin.Tracer
-	{
-		var (
-			err           error
-			hostPort      = fmt.Sprintf("localhost:%s", cfg.httpPort)
-			serviceName   = cfg.serviceName
-			useNoopTracer = (cfg.zipkinV2URL == "")
-			reporter      = zipkinhttp.NewReporter(cfg.zipkinV2URL)
-		)
-		//defer reporter.Close()
-		zEP, _ := zipkin.NewEndpoint(serviceName, hostPort)
-		zipkinTracer, err = zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(zEP), zipkin.WithNoopTracer(useNoopTracer))
-		if err != nil {
-			logger.Log("err", err)
-			os.Exit(1)
-		}
-		if !useNoopTracer {
-			logger.Log("tracer", "Zipkin", "type", "Native", "URL", cfg.zipkinV2URL)
-		}
-	}
-
+func NewServer(conn *grpc.ClientConn, tracer stdopentracing.Tracer, zipkinTracer *stdzipkin.Tracer, logger log.Logger) (pb.FoosvcServer, http.Handler) {
 	addsvcservice := addsvctransports.NewGRPCClient(conn, tracer, zipkinTracer, logger)
 	service := service.New(addsvcservice, logger)
 	endpoints := endpoints.New(service, logger, tracer, zipkinTracer)
@@ -154,6 +131,30 @@ func NewServer(cfg config, conn *grpc.ClientConn, logger log.Logger) (pb.FoosvcS
 	grpcServer := transports.MakeGRPCServer(endpoints, tracer, zipkinTracer, logger)
 
 	return grpcServer, httpHandler
+}
+
+func initOpentracing() (tracer stdopentracing.Tracer) {
+	return stdopentracing.GlobalTracer()
+}
+
+func initZipkin(serviceName, httpPort, zipkinV2URL string, logger log.Logger) (zipkinTracer *zipkin.Tracer) {
+	var (
+		err           error
+		hostPort      = fmt.Sprintf("localhost:%s", httpPort)
+		useNoopTracer = (zipkinV2URL == "")
+		reporter      = zipkinhttp.NewReporter(zipkinV2URL)
+	)
+	zEP, _ := zipkin.NewEndpoint(serviceName, hostPort)
+	zipkinTracer, err = zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(zEP), zipkin.WithNoopTracer(useNoopTracer))
+	if err != nil {
+		logger.Log("err", err)
+		os.Exit(1)
+	}
+	if !useNoopTracer {
+		logger.Log("tracer", "Zipkin", "type", "Native", "URL", zipkinV2URL)
+	}
+
+	return
 }
 
 func startHTTPServer(cfg config, httpHandler http.Handler, logger log.Logger, errs chan error) {
