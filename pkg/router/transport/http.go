@@ -11,12 +11,12 @@ import (
 	stdzipkin "github.com/openzipkin/zipkin-go"
 	"google.golang.org/grpc"
 
-	addsvcendpoint "github.com/cage1016/gokitsonsulk8s/pkg/addsvc/endpoints"
-	addsvcservice "github.com/cage1016/gokitsonsulk8s/pkg/addsvc/service"
-	addsvctransports "github.com/cage1016/gokitsonsulk8s/pkg/addsvc/transports"
-	foosvcendpoint "github.com/cage1016/gokitsonsulk8s/pkg/foosvc/endpoints"
-	foosvcservice "github.com/cage1016/gokitsonsulk8s/pkg/foosvc/service"
-	foosvctransports "github.com/cage1016/gokitsonsulk8s/pkg/foosvc/transports"
+	addsvcendpoint "github.com/cage1016/gokitconsulk8s/pkg/addsvc/endpoints"
+	addsvcservice "github.com/cage1016/gokitconsulk8s/pkg/addsvc/service"
+	addsvctransports "github.com/cage1016/gokitconsulk8s/pkg/addsvc/transports"
+	foosvcendpoint "github.com/cage1016/gokitconsulk8s/pkg/foosvc/endpoints"
+	foosvcservice "github.com/cage1016/gokitconsulk8s/pkg/foosvc/service"
+	foosvctransports "github.com/cage1016/gokitconsulk8s/pkg/foosvc/transports"
 )
 
 func MakeHandler(ctx context.Context, addsvc, foosvc string, retryMax, retryTimeout int64, tracer stdopentracing.Tracer, zipkinTracer *stdzipkin.Tracer, logger log.Logger) http.Handler {

@@ -1,4 +1,4 @@
-module github.com/cage1016/gokitsonsulk8s
+module github.com/cage1016/gokitconsulk8s
 
 require (
 	github.com/VividCortex/gohistogram v1.0.0 // indirect

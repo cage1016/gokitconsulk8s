@@ -19,11 +19,11 @@ import (
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
-	pb "github.com/cage1016/gokitsonsulk8s/pb/foosvc"
-	addsvctransports "github.com/cage1016/gokitsonsulk8s/pkg/addsvc/transports"
-	"github.com/cage1016/gokitsonsulk8s/pkg/foosvc/endpoints"
-	"github.com/cage1016/gokitsonsulk8s/pkg/foosvc/service"
-	"github.com/cage1016/gokitsonsulk8s/pkg/foosvc/transports"
+	pb "github.com/cage1016/gokitconsulk8s/pb/foosvc"
+	addsvctransports "github.com/cage1016/gokitconsulk8s/pkg/addsvc/transports"
+	"github.com/cage1016/gokitconsulk8s/pkg/foosvc/endpoints"
+	"github.com/cage1016/gokitconsulk8s/pkg/foosvc/service"
+	"github.com/cage1016/gokitconsulk8s/pkg/foosvc/transports"
 )
 
 const (

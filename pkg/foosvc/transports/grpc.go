@@ -4,9 +4,6 @@ import (
 	"context"
 	"time"
 
-	pb "github.com/cage1016/gokitsonsulk8s/pb/foosvc"
-	"github.com/cage1016/gokitsonsulk8s/pkg/foosvc/endpoints"
-	"github.com/cage1016/gokitsonsulk8s/pkg/foosvc/service"
 	"github.com/go-kit/kit/circuitbreaker"
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
@@ -21,6 +18,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	pb "github.com/cage1016/gokitconsulk8s/pb/foosvc"
+	"github.com/cage1016/gokitconsulk8s/pkg/foosvc/endpoints"
+	"github.com/cage1016/gokitconsulk8s/pkg/foosvc/service"
 )
 
 type grpcServer struct {

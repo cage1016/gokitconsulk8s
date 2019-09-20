@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 
-	routertransport "github.com/cage1016/gokitsonsulk8s/pkg/router/transport"
+	routertransport "github.com/cage1016/gokitconsulk8s/pkg/router/transport"
 )
 
 const grpcRouterReg = `([a-zA-Z]+)/`

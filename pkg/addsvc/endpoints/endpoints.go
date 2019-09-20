@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/cage1016/gokitsonsulk8s/pkg/addsvc/service"
 	"github.com/go-kit/kit/circuitbreaker"
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
@@ -15,6 +14,8 @@ import (
 	stdzipkin "github.com/openzipkin/zipkin-go"
 	"github.com/sony/gobreaker"
 	"golang.org/x/time/rate"
+
+	"github.com/cage1016/gokitconsulk8s/pkg/addsvc/service"
 )
 
 // Endpoints collects all of the endpoints that compose the addsvc service. It's

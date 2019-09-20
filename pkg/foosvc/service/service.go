@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 
-	addsvcservice "github.com/cage1016/gokitsonsulk8s/pkg/addsvc/service"
+	addsvcservice "github.com/cage1016/gokitconsulk8s/pkg/addsvc/service"
 )
 
 // Middleware describes a service (as opposed to endpoint) middleware.
