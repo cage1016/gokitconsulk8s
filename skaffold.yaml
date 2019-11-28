@@ -1,43 +1,50 @@
-apiVersion: skaffold/v1beta13
+apiVersion: skaffold/v1
 kind: Config
 build:
-  local: {}
-  tagPolicy:
-    sha256: {}
   artifacts:
     - image: cage1016/gokitconsulk8s-addsvc
       custom:
-        buildCommand: "make dev_docker_addsvc"
+        buildCommand: make dev_docker_addsvc
         dependencies:
           paths:
             - cmd/addsvc/main.go
             - pkg/addsvc
     - image: cage1016/gokitconsulk8s-foosvc
       custom:
-        buildCommand: "make dev_docker_foosvc"
+        buildCommand: make dev_docker_foosvc
         dependencies:
           paths:
             - cmd/foosvc/main.go
             - pkg/foosvc
     - image: cage1016/gokitconsulk8s-router
       custom:
-        buildCommand: "make dev_docker_router"
+        buildCommand: make dev_docker_router
         dependencies:
           paths:
-            - cmd/router/main.go
+            - cmd
             - pkg/router
+            - pkg/foosvc
+            - pkg/addsvc
     - image: cage1016/gokitconsulk8s-website
       context: deployments/k8s/website
       docker:
         dockerfile: DockerFile
+  tagPolicy:
+    sha256: {}
+  local: {}
 deploy:
   kubectl:
     manifests:
       - ./deployments/k8s/*.yaml
-#  helm:
-#    releases:
-#    - name: gokitconsulk8s-helm
-#      chartPath: deployments/k8s
-#      values:
-#        addsvc.image: cage1016/gokitconsulk8s-addsvc:latest
-#        foosvc.image: cage1016/gokitconsulk8s-foosvc:latest
+profiles:
+  - name: debug
+    patches:
+      - op: replace
+        path: /build/artifacts/0/custom/buildCommand
+        value: make debug_docker_addsvc
+#      - op: replace
+#        path: /build/artifacts/1/custom/buildCommand
+#        value: make debug_docker_foosvc
+#      - op: replace
+#        path: /build/artifacts/2/custom/buildCommand
+#        value: make debug_docker_router

@@ -46,15 +46,15 @@ skaffold run
 
 ```bash
 ## gateway 8080 sum
-$ curl -X "POST" "http://localhost:8080/api/addsvc/sum" -H 'Content-Type: application/json; charset=utf-8' -d $'{ "a": 3, "b": 34}'
+$ curl -X "POST" "http://localhost:8080/api/addsvc/sum" -H 'Content-Type: application/json; charset=utf-8' -d '{ "a": 3, "b": 34}'
 {"rs":37,"err":null}
 
 ## gateway 8080 concat
-$ curl -X "POST" "http://localhost:8080/api/addsvc/concat" -H 'Content-Type: application/json; charset=utf-8' -d $'{ "a": "3", "b": "34"}'
+$ curl -X "POST" "http://localhost:8080/api/addsvc/concat" -H 'Content-Type: application/json; charset=utf-8' -d '{ "a": "3", "b": "34"}'
 {"rs":"334","err":null}
 
 ## gateway 8080 foo
-$ curl -X "POST" "http://localhost:8080/api/foosvc/foo" -H 'Content-Type: application/json; charset=utf-8' -d $'{"s": "3ddd"}'
+$ curl -X "POST" "http://localhost:8080/api/foosvc/foo" -H 'Content-Type: application/json; charset=utf-8' -d '{"s": "3ddd"}'
 {"res":"3dddbar","err":null}
 
 ## grpc 8081 sum

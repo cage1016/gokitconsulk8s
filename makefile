@@ -1,46 +1,40 @@
+PROJECT_NAME = gokitconsulk8s
+BINARY_PREFIX = ${PROJECT_NAME}
+IMAGE_PREFIX = cage1016/${BINARY_PREFIX}
 BUILD_DIR = build
-SERVICES = addsvc foosvc router
-DOCKERS_CLEANBUILD = $(addprefix prod_docker_,$(SERVICES))
-DOCKERS_DEV = $(addprefix dev_docker_,$(SERVICES))
+SERVICES = addsvc router foosvc
+DOCKERS_CLEANBUILD = $(addprefix cleanbuild_docker_,$(SERVICES))
+DOCKERS = $(addprefix dev_docker_,$(SERVICES))
 DOCKERS_DEBUG = $(addprefix debug_docker_,$(SERVICES))
 STAGES = dev debug prod
-COMPOSEUP = $(addsuffix -compose-up,$(STAGES))
-COMPOSEDOWN = $(addsuffix -compose-down,$(STAGES))
 CGO_ENABLED ?= 0
 GOOS ?= linux
-# GOOS ?= darwin
+DEBUG_GOGCFLAGS = -gcflags='all=-N -l'
+GOGCFLAGS = -ldflags '-s -w'
+SHELL  := env BUILD_TAGS=$(BUILD_TAGS) $(SHELL)
+BUILD_TAGS ?= "alpha"
 
 define compile_service
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) GOARM=$(GOARM) go build -ldflags "-s -w" -o ${BUILD_DIR}/gokitconsulk8s-$(1) cmd/$(1)/main.go
-endef
-
-define compile_debug_service
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) GOARM=$(GOARM) go build -gcflags "all=-N -l" -o ${BUILD_DIR}/gokitconsulk8s-$(1) cmd/$(1)/main.go
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) GOARM=$(GOARM) go build -tags ${BUILD_TAGS} $(2) -o ${BUILD_DIR}/${BINARY_PREFIX}-$(1) cmd/$(1)/main.go
 endef
 
 define make_docker_cleanbuild
-	docker build --no-cache --build-arg SVC_NAME=$(subst prod_docker_,,$(1)) --tag=cage1016/gokitconsulk8s-$(subst prod_docker_,,$(1)) -f deployments/docker/Dockerfile .
+	docker build --no-cache --build-arg PROJECT_NAME=${PROJECT_NAME} --build-arg BINARY=${BINARY_PREFIX}-$(1) --tag=${IMAGE_PREFIX}-$(1) -f deployments/docker/Dockerfile.cleanbuild .
 endef
 
-define make_docker_dev
-	docker build --build-arg SVC_NAME=$(subst dev_docker_,,$(1)) --tag=cage1016/gokitconsulk8s-$(subst dev_docker_,,$(1)) -f deployments/docker/Dockerfile.dev ./build
-endef
-
-define make_docker_debug
-	docker build --build-arg SVC_NAME=$(subst debug_docker_,,$(1)) --tag=cage1016/gokitconsulk8s-debug-$(subst debug_docker_,,$(1)) -f deployments/docker/Dockerfile.debug ./build
+define make_docker
+	docker build --build-arg BINARY=${BINARY_PREFIX}-$(1) --tag=${IMAGE_PREFIX}-$(1) -f deployments/docker/$(2) ./build
 endef
 
 all: $(SERVICES)
 
-.PHONY: all $(SERVICES) dockers dockers_dev dockers_debug
+.PHONY: all $(SERVICES) dev_dockers debug_dockers cleanbuild_dockers test
 
-cleandocker: cleanghost
-	# Stop all containers (if running)
-	docker-compose -f deployments/docker/docker-compose.yaml stop
-	# Remove gokitconsulk8s containers
-	docker ps -f name=gokitconsulk8s -aq | xargs docker rm
-	# Remove old gokitconsulk8s images
-	docker images -q cage1016/gokitconsulk8s-* | xargs docker rmi
+cleandocker:
+	# Remove retailbase containers
+	docker ps -f name=${IMAGE_PREFIX}-* -aq | xargs docker rm
+	# Remove old retailbase images
+	docker images -q ${IMAGE_PREFIX}-* | xargs docker rmi
 
 # Clean ghost docker images
 cleanghost:
@@ -55,7 +49,8 @@ install:
 	cp ${BUILD_DIR}/* $(GOBIN)
 
 test:
-	go test -v -race -tags test $(shell go list ./... | grep -v 'vendor\|cmd')
+	# DEBUG=true bash -c "go test -v github.com/qeek-dev/retailbase/<package-name> -run ..."
+	go test -v -race -tags test $(shell go list ./... | grep -v 'vendor')
 
 PD_SOURCES:=$(shell find ./pb -type d)
 proto:
@@ -78,61 +73,53 @@ else
 endif
 
 $(SERVICES):
-	$(call compile_service,$(@))
+	$(call compile_service,$(@),${GOGCFLAGS})
 
 $(DOCKERS_CLEANBUILD):
-	$(call make_docker_cleanbuild,$(@))
+	$(call make_docker_cleanbuild,$(subst cleanbuild_docker_,,$(@)))
 
-$(DOCKERS_DEV):
-	$(call compile_service,$(subst dev_docker_,,$(@)))
-	$(call make_docker_dev,$(subst dev_docker_,,$(@)))
+$(DOCKERS):
+	@echo BUILD_TAGS=${BUILD_TAGS}
+
+	@if [ "$(filter $(@:dev_docker_%=%), $(SERVICES))" != "" ]; then\
+		$(call compile_service,$(subst dev_docker_,,$(@)),${GOGCFLAGS});\
+		$(call make_docker,$(subst dev_docker_,,$(@)),Dockerfile);\
+		if [ "$(PUSH_IMAGE)" == "true" ]; then \
+			docker push ${IMAGE_PREFIX}-$(subst dev_docker_,,$(@)); \
+		fi \
+	else\
+		docker build --tag=${IMAGE_PREFIX}-$(@:dev_docker_%=%) -f deployments/docker/Dockerfile.mappingsvc .;\
+		if [ "$(PUSH_IMAGE)" == "true" ]; then \
+			docker push ${IMAGE_PREFIX}-$(@:dev_docker_%=%); \
+		fi \
+	fi
 
 $(DOCKERS_DEBUG):
-	$(call compile_debug_service,$(subst debug_docker_,,$(@)))
-	$(call make_docker_debug,$(subst debug_docker_,,$(@)))
+	$(call compile_service,$(subst debug_docker_,,$(@)),${DEBUG_GOGCFLAGS})
+	$(call make_docker,$(subst debug_docker_,,$(@)),Dockerfile.debug)
 
 services: $(SERVICES)
 
-prod_dockers: $(DOCKERS_CLEANBUILD)
+dev_dockers: $(DOCKERS)
 
 debug_dockers: $(DOCKERS_DEBUG)
 
-dev_dockers: $(DOCKERS_DEV)
+cleanbuild_dockers: $(DOCKERS_CLEANBUILD)
 
-define make_docker_compose_up
-	@if [ $(1) == prod ]; then \
-		echo "docker-compose -f deployments/docker/docker-compose.yaml up -d"; \
-		docker-compose -f deployments/docker/docker-compose.yaml up -d; \
-	else \
-		echo "docker-compose -f deployments/docker/docker-compose-$(1).yaml up -d"; \
-		docker-compose -f deployments/docker/docker-compose-$(1).yaml up -d; \
-	fi
-endef
+rest_sum:
+	curl -X "POST" "http://localhost:8080/api/addsvc/sum" -H 'Content-Type: application/json; charset=utf-8' -d '{ "a": 3, "b": 34}'
 
-define make_docker_compose_down
-	@if [ $(1) == prod ]; then \
-		echo "docker-compose -f deployments/docker/docker-compose.yaml down"; \
-		docker-compose -f deployments/docker/docker-compose.yaml down; \
-	else \
-		echo "docker-compose -f deployments/docker/docker-compose-$(1).yaml down"; \
-		docker-compose -f deployments/docker/docker-compose-$(1).yaml down; \
-	fi
-endef
+rest_concat:
+	curl -X "POST" "http://localhost:8080/api/addsvc/concat" -H 'Content-Type: application/json; charset=utf-8' -d '{ "a": "3", "b": "34"}'
 
-$(COMPOSEUP):
-	$(call make_docker_compose_up,$(subst -compose-up,,$(@)))
+rest_foo:
+	curl -X "POST" "http://localhost:8080/api/foosvc/foo" -H 'Content-Type: application/json; charset=utf-8' -d '{"s": "3ddd"}'
 
-$(COMPOSEDOWN):
-	$(call make_docker_compose_down,$(subst -compose-down,,$(@)))
+grpc_sum:
+	grpcurl -plaintext -proto ./pb/addsvc/addsvc.proto -d '{"a": 3, "b":5}' localhost:8081 pb.Addsvc.Sum
 
-u:
-	make dev-compose-up
-#	make debug-compose-up
-#	make prod-compose-up
+grpc_concat:
+	grpcurl -plaintext -proto ./pb/addsvc/addsvc.proto -d '{"a": "3", "b":"5"}' localhost:8081 pb.Addsvc.Concat
 
-d:
-	make dev-compose-down
-#	make debug-compose-down
-#	make prod-compose-down
-
-r: d u l
+grpc_foo:
+	grpcurl -plaintext -proto ./pb/foosvc/foosvc.proto -d '{"s": "foo"}' localhost:8081 pb.Foosvc.Foo

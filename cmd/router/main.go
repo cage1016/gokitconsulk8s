@@ -33,7 +33,6 @@ const grpcRouterReg = `([a-zA-Z]+)/`
 
 const (
 	defZipkinV2URL   = ""
-	defNameSpace     = "gokitconsulk8s"
 	defServiceName   = "router"
 	defLogLevel      = "error"
 	defHTTPPort      = ""
@@ -44,7 +43,6 @@ const (
 	defFoosvcURL     = ""
 
 	envZipkinV2URL  = "QS_ZIPKIN_V2_URL"
-	envNameSpace    = "QS_ROUTER_NAMESPACE"
 	envServiceName  = "QS_ROUTER_SERVICE_NAME"
 	envLogLevel     = "QS_ROUTER_LOG_LEVEL"
 	envHTTPPort     = "QS_ROUTER_HTTP_PORT"
@@ -53,6 +51,11 @@ const (
 	envRetryTimeout = "QS_ROUTER_RETRY_TIMEOUT"
 	envAddsvcURL    = "QS_ADDSVC_URL"
 	envFoosvcURL    = "QS_FOOSVC_URL"
+)
+
+const (
+	routerAddsvc = "addsvc"
+	routerFoosvc = "foosvc"
 )
 
 // Env reads specified environment variable. If no value has been found,
@@ -93,10 +96,13 @@ func main() {
 	tracer := initOpentracing()
 	zipkinTracer := initZipkin(cfg.serviceName, cfg.httpPort, cfg.zipkinV2URL, logger)
 	ctx := context.Background()
-	r := routertransport.MakeHandler(ctx, cfg.addsvcURL, cfg.foosvcURL, cfg.retryMax, cfg.retryMax, tracer, zipkinTracer, logger)
+
+	hb := routertransport.NewHandlerBuilder()
+	hb.AddHandler(routerAddsvc, routertransport.MakeAddSvcHandler(ctx, cfg.addsvcURL, tracer, zipkinTracer, logger))
+	hb.AddHandler(routerFoosvc, routertransport.MakeFooSvcHandler(ctx, cfg.foosvcURL, tracer, zipkinTracer, logger))
 
 	errs := make(chan error, 1)
-	go startHTTPServer(r, cfg.httpPort, logger, errs)
+	go startHTTPServer(hb.Router, cfg.httpPort, logger, errs)
 	go startGRPCServer(zipkinTracer, cfg.grpcPort, cfg.routerMap, logger, errs)
 
 	go func() {
@@ -131,8 +137,8 @@ func loadConfig(logger log.Logger) (cfg config) {
 	cfg.foosvcURL = env(envFoosvcURL, defFoosvcURL)
 
 	cfg.routerMap = map[string]string{}
-	cfg.routerMap["addsvc"] = cfg.addsvcURL
-	cfg.routerMap["foosvc"] = cfg.foosvcURL
+	cfg.routerMap[routerAddsvc] = cfg.addsvcURL
+	cfg.routerMap[routerFoosvc] = cfg.foosvcURL
 	return
 }
 
