@@ -1,12 +1,8 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.18.0 ()
-  creationTimestamp: null
   labels:
-    io.kompose.service: foosvc
+    app: foosvc
   name: foosvc
 spec:
   replicas: 1
@@ -15,7 +11,7 @@ spec:
     metadata:
       creationTimestamp: null
       labels:
-        io.kompose.service: foosvc
+        app: foosvc
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/connect-service": "foosvc"
@@ -37,6 +33,26 @@ spec:
               value: http://localhost:9411/api/v2/spans
           image: cage1016/gokitconsulk8s-foosvc
           name: foosvc
-          resources: {}
+        - name: prometheus-statsd
+          image: "prom/statsd-exporter:latest"
+          ports:
+          - name: metrics
+            containerPort: 9102
+          - name: statsd
+            containerPort: 9125
       restartPolicy: Always
-status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: foosvc
+    tag: gokitconsul
+  name: foosvc
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9102
+  selector:
+    app: foosvc
